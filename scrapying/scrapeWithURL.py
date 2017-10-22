@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import sys
+import time
 import codecs
 import csv
 import requests
@@ -60,7 +61,7 @@ def generateBasicData(item):
     aptAddress = getTextWithTag('li', item, 'cassetteitem_detail-col1') # get aptAddress
     cassetteitem_detail_col2s = getItemWithLi(item, 'cassetteitem_detail-col2') # get a block for aptTransportation
     aptTransportation = getTextWithTag3('div', cassetteitem_detail_col2s) # get aptTransportation
-    
+
     #駅情報は3つあるのでカンマでsplitして一つ一つに分解する
     aptTransportationArray = aptTransportation.split(",")
     max = len(aptTransportationArray)
@@ -83,10 +84,10 @@ def generateBasicData(item):
         newAptTransportationArray.append(dist)
     aptTransportation = ",".join(newAptTransportationArray)
     return aptAddress + comma + aptTransportation + comma + aptDetail
-    
+
     cassetteitem_detail_col3s = getItemWithLi(item, 'cassetteitem_detail-col3') # get a block for aptDetail
     aptDetail = getTextWithTag2('div', cassetteitem_detail_col3s) # get aptDetail
-    
+
     #築年数を数字にする現状階数はやる必要があるのか不明のためやっていない
     aptDetail = aptDetail.split(",")
     if (len(aptDetail[0]) == 2):
@@ -98,9 +99,9 @@ def generateBasicData(item):
 
 
 # to retrieve each data
-# [0]- [1]- [2]階 Floor [3]賃料 Rent [4]管理費 Admin [5]敷/礼/保証/敷引,償却 Sec 
+# [0]- [1]- [2]階 Floor [3]賃料 Rent [4]管理費 Admin [5]敷/礼/保証/敷引,償却 Sec
 # [6]間取り type [7]専有面積 square [8]- [9]お気に入り [10]- Link
-# 
+#
 ###
 def generateRoomData(item):
     rmData = ""
@@ -120,9 +121,9 @@ def generateRoomData(item):
                 else:
                     rmData += j + ","
         elif(i == 7 and tds[i]): #専有面積のm2を消してintにする
-            rmData += (tds[i].text[0:-2]) 
+            rmData += (tds[i].text[0:-2])
         else:
-            rmData += (tds[i].text + ",") 
+            rmData += (tds[i].text + ",")
     #rmData += tds[10].find('a')['href'] # get Link(詳細ページ用)
     return rmData
 
@@ -158,33 +159,37 @@ def checkPagenation(source):
 def main():
     # set initial page number
     page = 1
-    url = sys.argv[1]
+    wait = 3
+    fileName = sys.argv[1]
+    url = sys.argv[2]
     dataList = ["住所,移動1,距離1,移動2,距離2,移動3,距離3,築年数,全階数,部屋階,賃料,管理費,敷,礼,保証,敷引|償却,間取り,専有面積,詳細リンク"] # to store each csv data
-    fileName = "output"
     with requests.Session() as session: # create session
         while True:
-            response = session.get(url.format(page=page))
+            connectURL = url + "&pn=" + str(page)
+            response = session.get(connectURL)
             # store contents in soup
             soup = BeautifulSoup(response.content, "html.parser")
 
             # Parent box which contain all the data for each apt
-            items = getAllWithTagClass(soup, 'div', 'cassetteitem')            
-            
+            items = getAllWithTagClass(soup, 'div', 'cassetteitem')
+
             # ここでcsvを生成している
-            dataList = generateData(items, dataList) # update 
-            
+            dataList = generateData(items, dataList) # update
+
             # break if there is no more "Next Page"
-            break
             if not checkPagenation(soup):
                 break
-
+            print(connectURL)
+            if(page%5 == 0):
+                print ("現在 : " + str(page))
             page += 1
+            time.sleep(wait)
 
     with open(fileName + '.csv', 'w') as f:
         wr = csv.writer(f, delimiter='\n')
         wr.writerow(dataList)
     #print(dataList)
     print("SUCCESS")
-    
+
 if __name__ == '__main__':
     main()
